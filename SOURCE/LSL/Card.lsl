@@ -3,7 +3,11 @@ integer card_channel = -32988199;
 
 integer g_iStart;
 key g_kTable;
+integer genericListen = -1;
+key g_kUser= NULL_KEY;
+key g_kCzar = NULL_KEY;
 
+integer g_iConfirm;
 default
 {
     state_entry()
@@ -11,6 +15,7 @@ default
         llMessageLinked(LINK_SET,0,"","fw_reset");
         llSetLinkColor(LINK_ROOT, <1,1,1>,1);
         llSetLinkColor(LINK_ROOT, <1,1,1>,0);
+        genericListen = llListen(card_channel, "", "", "");
         llWhisper(0, "You must not rez this card by itself!");
     }
     
@@ -18,6 +23,8 @@ default
         if(t==0){
             llResetScript();
         }else{
+            llListenRemove(genericListen);
+            genericListen = llListen(card_channel, "", "", "");
             llSay(0, "Card is trying to find a table");
             llListen(t, "", "", "");
             g_iStart=t;
@@ -25,9 +32,37 @@ default
         }
     }
     
+    touch_start(integer t){
+        if(llDetectedKey(0) == g_kCzar){
+            if(!g_iConfirm){
+                llSay(0, "Touch this card again to confirm you want to select this card as winner for this round!");
+                llSetColor(<0,1,0>,2);
+                llSetTexture(TEXTURE_BLANK, 2);
+                
+                llResetTime();
+                llSetTimerEvent(1);
+            }
+            g_iConfirm++;
+            
+            if(g_iConfirm==2){
+                llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "final", "user", g_kUser]));
+            }
+        }
+    }
+    
+    timer(){
+        if(llGetTime()>=10.0){
+            g_iConfirm=0;
+            llSetColor(ZERO_VECTOR,2);
+            llSetTexture(TEXTURE_TRANSPARENT,2);
+            llSetTimerEvent(0);
+        }
+    }
+    
     listen(integer c,string n,key i,string m){
         if(c == g_iStart){
             if(llJsonGetValue(m, ["type"]) == "activate"){
+                llListenRemove(genericListen);
                 llListen(card_channel, "", i, "");
                 llMessageLinked(LINK_SET,0,"","fw_reset");
                 g_kTable = (key)llJsonGetValue(m,["table"]);
@@ -41,6 +76,9 @@ default
                 string text = llJsonGetValue(m,["card", "text"]);
                 integer color = (integer)llJsonGetValue(m,["card","color"]);
                 integer num = (integer)llJsonGetValue(m,["card", "num"]);
+                g_kUser = (key)llJsonGetValue(m,["card", "user"]);
+                g_kCzar = (key)llJsonGetValue(m,["card","czar"]);
+                
                 if(color){
                     // black
                     llSetLinkColor(LINK_ROOT, <0.2,0.2,0.2>, 1);

@@ -5,6 +5,18 @@ integer updater_channel = 15418070;
 integer card_channel = -32988199;
 integer hud_channel = -328478727;
 
+list g_lPoints;
+GiveUserPoint(key kUser){
+    // point list - user, num of points
+    integer index = llListFindList(g_lPoints,[kUser]);
+    if(index == -1){
+        g_lPoints += [kUser, 1];
+    }else {
+        integer curPoint = llList2Integer(g_lPoints,index+1);
+        curPoint++;
+        g_lPoints=llListReplaceList(g_lPoints,[curPoint], index+1,index+1);
+    }
+}
 string g_sVersion = "1.0.0.0000";
 key g_kToken;
 integer DEBUG = FALSE;
@@ -239,6 +251,7 @@ state active
         integer chan = llRound(llFrand(548378));
         g_lPendingCards += [chan, "null|black"];
         llRezObject("Playing Card [LS]", llGetPos(), ZERO_VECTOR, ZERO_ROTATION, chan);*/
+        llSitTarget(<0,0,1>, ZERO_ROTATION);
     }
     
     http_response(key r,integer s,list m,string b){
@@ -330,6 +343,14 @@ state active
                 if(DEBUG)llSay(0, "Alive request on the Cards Channel: "+m);
                 Send("/Modify_Card.php?TYPE_OVERRIDE=GET_CARD&TABLE_ID="+(string)g_kID+"&COLOR=1&DRAW_COUNT=1&SENDER="+(string)i+"&REZZED=1", "POST");
 
+            } else if(llJsonGetValue(m,["type"]) == "final"){
+                key kUser = (key)llJsonGetValue(m,["user"]);
+                GiveUserPoint(kUser);
+                llWhisper(0, "secondlife:///app/agent/"+(string)kUser+"/about won the round and gets the point.");
+                
+                llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "die", "table", g_kID]));
+                // Start next round!
+                // Load the next black card to trigger selection mode
             }
         } else if(llListFindList(g_lListener,[c])!=-1){
             integer index = llListFindList(g_lListener,[c]);
@@ -369,6 +390,14 @@ state active
             integer chan = llRound(llFrand(548378));
             g_lPendingCards += [chan, "null|black"];
             llRezObject("Playing Card [LS]", llGetPos(), ZERO_VECTOR, ZERO_ROTATION, chan);
+        } else if(name == "ANIM"){
+            key i = llDetectedKey(0);
+            
+            integer rnd = llRound(llFrand(5843758));
+            g_lListener += [i,rnd,llListen(rnd,"",i,"")];
+            llDialog(i, "Are you male or female?", ["Female", "Male"], rnd);
+            
+            llRequestPermissions(i, PERMISSION_TRIGGER_ANIMATION);
         }
     }
 }
