@@ -7,7 +7,7 @@ integer DEBUG=FALSE;
 integer card_channel = -32988199;
 integer hud_channel = -328478727;
 
-vector g_vLastPos1 = <0.02395, 0.47113, -0.15166>;
+vector g_vLastPos1 = <0.00000, 0.34831, -0.10162>;
 
 s(string m){
     llInstantMessage(g_kUser,m);
@@ -20,12 +20,12 @@ Cards(){
     integer CurCard = 1;
     integer NCard = 0;
     
-    if(DEBUG)llSay(0, "CARD LIST: "+llDumpList2String(g_lCards, " - "));
+    //if(DEBUG)llSay(0, "CARD LIST: "+llDumpList2String(g_lCards, " - "));
     
     for(x=0;x<e;x++){
         if(llGetListLength(g_lCards) > x){
             string card_params = llList2String(g_lCards,x);
-            if(DEBUG)llSay(0,"Card Parameters: "+card_params);
+            //if(DEBUG)llSay(0,"Card Parameters: "+card_params);
             llMessageLinked(LINK_SET,0,llJsonGetValue(card_params,["text"]), "fw_data : card_text"+(string)CurCard);
 
             if(llStringLength(llJsonGetValue(card_params,["text"]))>128){
@@ -69,16 +69,16 @@ POS2(){
 }
 
 list g_lSelected = [];
-list g_lActualCards = [1, 2, 
-        2, 23,
-        3, 44,
-        4, 65,
-        5, 86,
-        6, 107,
-        7, 128,
-        8, 149,
-        9, 170,
-        10, 191
+list g_lActualCards = [1, 23, 
+        2, 44,
+        3, 65,
+        4, 86,
+        5, 107,
+        6, 128,
+        7, 149,
+        8, 170,
+        9, 191,
+        10, 212
         ];
 
 Highlight(){
@@ -112,6 +112,16 @@ ShowPrompt(){
     llDialog(g_kUser, "Do you want to submit your selected card(s)?", ["Yes", "No"], g_iChan);
 }
 
+czar(string m){
+    
+    llMessageLinked(LINK_SET, 0, "<!c=white>"+llJsonGetValue(m,["card"]), "fw_data : czarcard_text");
+    integer num = (integer)llJsonGetValue(m,["num"]);
+    if(num==0){
+        llMessageLinked(LINK_SET,0,"<!c=white>Cards Against Humanity", "fw_data : czarcard_helpertext");
+    } else {
+        llMessageLinked(LINK_SET,0,"<!c=white>Pick ("+(string)num+")\nDraw ("+(string)num+")", "fw_data : czarcard_helpertext");
+    }
+}
 default
 {
     state_entry()
@@ -126,6 +136,9 @@ default
         
         //g_lSelected = [5, 7, 1];
         Highlight();
+        
+        llSetLinkColor(2, <0.078, 0.078, 0.078>, 0);
+        llSetLinkColor(2, <0.078, 0.078, 0.078>, 1);
     }
     
     on_rez(integer t){
@@ -140,7 +153,7 @@ default
     }
     
     listen(integer c,string n,key i,string m){
-        if(DEBUG)llSay(0, m);
+        //if(DEBUG)llSay(0, m);
         if(g_iStartParam == c){
             // listen for the UUID of who to attach the HUD to!
             if(llJsonGetValue(m,["type"])=="activate"){
@@ -165,18 +178,18 @@ default
                 if(g_kTable != (key)llJsonGetValue(m,["table"]))return;
                 if(llJsonGetValue(m,["czar"]) == (string)g_kUser){
                     s("You are the Card Czar, hiding the HUD");
-                    POS2();
                     g_iCanSelect=0;
                     Cards();
+                    POS2();
                 } else {
                     g_iSelectNum = (integer)llJsonGetValue(m,["sel_count"]);
-                    POS();
                     g_lSelected=[];
                     Highlight();
                     s("Select ("+(string)g_iSelectNum+") cards to submit");
                     s("Card czar: secondlife:///app/agent/"+llJsonGetValue(m,["czar"])+"/about");
                     Cards();
                     g_iCanSelect=1;
+                    POS();
                 }
             } else if(llJsonGetValue(m,["type"]) == "judging"){
                 if(g_kTable != (key)llJsonGetValue(m,["table"]))return;
@@ -191,13 +204,15 @@ default
                     g_iChan=0;
                 }
             } else if(llJsonGetValue(m,["type"])=="die"){
-                if(DEBUG)llSay(0, "(DEBUG)\nm: "+m+"\n-> Table: "+(string)g_kTable+"\n-> User: "+(string)g_kUser);
+                //if(DEBUG)llSay(0, "(DEBUG)\nm: "+m+"\n-> Table: "+(string)g_kTable+"\n-> User: "+(string)g_kUser);
                 if(llJsonGetValue(m,["table"])==(string)g_kTable){
                     if(llJsonGetValue(m,["avatar"])==(string)g_kUser || llJsonGetValue(m,["avatar"])==(string)NULL_KEY || llJsonGetValue(m,["avatar"])==""){
                         llSay(0, "Deactivating HUD");
                         state detach;
                     }
                 }
+            } else if(llJsonGetValue(m,["type"])=="czar"){
+                czar(m);
             }
         } else if(g_iChan == c){
             if(m == "No"){
@@ -247,7 +262,7 @@ default
             llMessageLinked(LINK_SET,0,llGetLinkName(llDetectedLinkNumber(0)),"fw_touchquery : "+(string)llDetectedLinkNumber(0) + ":" + (string)llDetectedTouchFace(0));
         }else s("You can't select a card right now");
         
-        if(DEBUG)llSay(0, "TOUCHED NUMBER: "+(string)llDetectedLinkNumber(0));
+        //if(DEBUG)llSay(0, "TOUCHED NUMBER: "+(string)llDetectedLinkNumber(0));
     }
     
     run_time_permissions(integer p){
@@ -278,6 +293,8 @@ default
             POS2();
             
             s("HUD initialization completed");
+            
+            //czar(llList2Json(JSON_OBJECT, ["card", "This is a test", "num", 4]));
         }else if (i == "fw_touchreply") {
             list     tokens    = llParseStringKeepNulls(m, [":"], []);
             string   boxName   = llList2String(tokens, 0);

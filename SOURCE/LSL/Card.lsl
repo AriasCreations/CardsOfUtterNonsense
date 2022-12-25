@@ -1,13 +1,13 @@
 
 integer card_channel = -32988199;
 
-string g_sText;
+string g_sText="NA";
 integer g_iStart;
 key g_kTable;
 integer genericListen = -1;
 key g_kUser= NULL_KEY;
 key g_kCzar = NULL_KEY;
-
+integer g_iInitialized;
 integer g_iConfirm;
 default
 {
@@ -29,6 +29,8 @@ default
             //llSay(0, "Card is trying to find a table");
             llListen(t, "", "", "");
             g_iStart=t;
+            //llSleep(2+llFrand(5));
+            llSetTimerEvent(1);
             llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "alive", "boot", t]));
         }
     }
@@ -47,34 +49,43 @@ default
             g_iConfirm++;
             
             if(g_iConfirm==2){
-                llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "final", "user", g_kUser]));
+                llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "final", "user", g_kUser, "text", g_sText]));
             }
         }
     }
     
     timer(){
-        if(llGetTime()>=10.0){
+        if(llGetTime()>=10.0 && g_iInitialized){
             g_iConfirm=0;
             llSetColor(ZERO_VECTOR,2);
             llSetTexture(TEXTURE_TRANSPARENT,2);
             llSetTimerEvent(0);
         }
+        
+        if(!g_iInitialized && llGetTime()>=5.0){
+            llResetTime();
+            llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "alive", "boot", g_iStart]));
+        }
     }
     
     listen(integer c,string n,key i,string m){
         if(c == g_iStart){
-            if(llJsonGetValue(m, ["type"]) == "activate"){
-                llListenRemove(genericListen);
-                llListen(card_channel, "", i, "");
-                llMessageLinked(LINK_SET,0,"","fw_reset");
+            if(llJsonGetValue(m, ["type"]) == "activate" && !g_iInitialized){
                 g_kTable = (key)llJsonGetValue(m,["table"]);
+                llListen(card_channel, "", i, "");
+                llListenRemove(genericListen);
+                llMessageLinked(LINK_SET,0,"","fw_reset");
+                g_iInitialized=1;
+                llSetPos((vector)llJsonGetValue(m,["pos"]));
+                llSetRot((rotation)llJsonGetValue(m,["rot"]));
             }
         } else if(c == card_channel){
             if(llJsonGetValue(m,["type"]) == "position"){
                 llSetPos((vector)llJsonGetValue(m,["pos"]));
+                llSetRot((rotation)llJsonGetValue(m,["rot"]));
             } else if(llJsonGetValue(m,["type"]) == "rotation"){
                 llSetRot((rotation)llJsonGetValue(m,["rot"]));
-            } else if(llJsonGetValue(m,["type"]) == "set"){
+            } else if(llJsonGetValue(m,["type"]) == "set" && g_sText == "NA"){
                 string text = llJsonGetValue(m,["card", "text"]);
                 integer color = (integer)llJsonGetValue(m,["card","color"]);
                 integer num = (integer)llJsonGetValue(m,["card", "num"]);

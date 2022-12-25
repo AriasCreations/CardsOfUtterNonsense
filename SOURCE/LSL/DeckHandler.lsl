@@ -30,7 +30,7 @@ UpDecks(){
         if((integer)llList2String(g_lSelectedDecks,i+1)) lAct += llList2String(g_lSelectedDecks,i);
         
     }
-    if(llGetListLength(lAct)==0)    llWhisper(0, "You cannot have no decks selected. The official deck will be automatically used as default when no decks are selected");
+    if(llGetListLength(lAct)==0)    llMessageLinked(LINK_SET, 50, "", "1");
     Send("/Modify_Card.php?TYPE_OVERRIDE=SET_OPTIONS&TABLE_ID="+(string)g_kID+"&DECK="+llEscapeURL(llStringToBase64(llDumpList2String(lAct, "~"))), "POST");
 }
 
@@ -100,7 +100,7 @@ default
         string name = llGetLinkName(llDetectedLinkNumber(0));
         if(name == "DECKS"){
             if(g_iStarted){
-                llSay(0, "You cannot change decks while a game is in progress! Stop the game first");
+                llMessageLinked(LINK_SET, 50, "", "2");
                 return;
             }
             DecksMenu(llDetectedKey(0));
@@ -109,6 +109,9 @@ default
     }
     http_response(key r,integer s,list m, string b){
         if(r == g_kCurrentReq){
+            if(s!=200){
+                llMessageLinked(LINK_SET, 50, "", "3");
+            }
             g_kCurrentReq = NULL_KEY;
             g_lReqs = llDeleteSubList(g_lReqs,0,1);
             
@@ -119,13 +122,13 @@ default
                 string Variable = llList2String(lTmp,1);
                 if(Variable == "License"){
                     if(llList2String(lTmp,2) == "1"){
-                        llSay(0, "License is now activated!");
+                        llMessageLinked(LINK_SET, 50, "", "4");
                         //state active;
-                        llWhisper(0, "Downloading list of decks...");
+                        llMessageLinked(LINK_SET, 50, "", "5");
                         Send("/Modify_Card.php?TYPE_OVERRIDE=OPTIONS&TABLE_ID="+(string)g_kID, "GET");
                        //Send("/Get_Product_Data.php?PRODUCT=CAH_TABLE&KEYID="+(string)g_kID+"&NICKNAME=Decks", "GET"); 
                     } else {
-                        llSay(0, "ERROR: No valid license key has been found. Try again later, or contact LS Bionics support\n\n[Error code: "+llList2String(lTmp,2)+"]");
+                        llMessageLinked(LINK_SET, 50, llList2String(lTmp,2), "6");
                     }
                 }
             } else if(Script == "Card_Options"){
@@ -173,7 +176,7 @@ default
                 } else if(m == "LOAD"){
                     llMessageLinked(LINK_SET,10,"","");
                     return;
-                } else llSay(0, "ERROR WHEN TOGGLING DECK. THIS IS A BUG. REPORT IT TO LS BIONICS (L:644)");
+                } else llMessageLinked(LINK_SET, 50, "", "7");
             } else {
                 g_lSelectedDecks = llListReplaceList(g_lSelectedDecks, [iNewDeck], pos+1,pos+1);
             }
