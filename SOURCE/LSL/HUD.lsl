@@ -7,12 +7,14 @@ integer DEBUG=FALSE;
 integer card_channel = -32988199;
 integer hud_channel = -328478727;
 
+vector g_vLastPos1 = <0.02395, 0.47113, -0.15166>;
 
 s(string m){
     llInstantMessage(g_kUser,m);
 }
 list g_lCards;
 Cards(){
+    if(!llGetAttached())return;
     integer x = 0;
     integer e = 10;
     integer CurCard = 1;
@@ -25,6 +27,10 @@ Cards(){
             string card_params = llList2String(g_lCards,x);
             if(DEBUG)llSay(0,"Card Parameters: "+card_params);
             llMessageLinked(LINK_SET,0,llJsonGetValue(card_params,["text"]), "fw_data : card_text"+(string)CurCard);
+
+            if(llStringLength(llJsonGetValue(card_params,["text"]))>128){
+                s("Card "+(string)x+": "+llJsonGetValue(card_params,["text"]));
+            }
         } else {
             NCard++;
             llMessageLinked(LINK_SET,0,"", "fw_data : card_text"+(string)CurCard);
@@ -48,7 +54,7 @@ integer g_iVis=0;
 POS(){
     if(!llGetAttached())return;
     g_iVis=1;
-    vector local = <0.02395, 0.47113, -0.15166>;
+    vector local = g_vLastPos1;
     llSetPrimitiveParams([PRIM_POS_LOCAL, local]);
 }
 
@@ -56,39 +62,40 @@ POS2(){
     if(!llGetAttached())return;
     g_iVis=0;
     vector local = <0.02395, 1.77734, -0.15166>;
-    llSetPrimitiveParams([PRIM_POS_LOCAL, local]);
+    if(llVecDist(llGetLocalPos(),local)>1){
+        g_vLastPos1 = llGetLocalPos();
+        llSetPrimitiveParams([PRIM_POS_LOCAL, local]);
+    }
 }
 
 list g_lSelected = [];
+list g_lActualCards = [1, 2, 
+        2, 23,
+        3, 44,
+        4, 65,
+        5, 86,
+        6, 107,
+        7, 128,
+        8, 149,
+        9, 170,
+        10, 191
+        ];
 
 Highlight(){
-    integer i=1;
-    integer end = 10;
-    for(i=1;i<=end;i++){
-        if(llListFindList(g_lSelected,[i])==-1){
-            integer x=0;
-            integer end2 = llGetNumberOfPrims();
-            for(x=1;x<=end2;x++){
-                string LinkName = llGetLinkName(x);
-                if(LinkName=="Card"+(string)i){
-                    llSetLinkColor(x, <1,1,1>, 2);
-                    jump stopFor;
-                }
-            }
-            @stopFor;
+    integer i=0;
+    integer end = llGetListLength(g_lActualCards);
+    for(i=0;i<end;i+=2){
+        if(llListFindList(g_lSelected,[llList2Integer(g_lActualCards,i)])==-1){
+            //llSay(0, "number : "+(string)llList2Integer(g_lActualCards,i)+" not found in selected card list.");
+            llSetLinkColor(llList2Integer(g_lActualCards, i+1), <1,1,1>, 2);
+            //llSay(0, "set "+llList2String(g_lActualCards,i+1)+" to white on face 2");
         } else {
-            integer x = 0;
-            integer end2 = llGetNumberOfPrims();
-            for(x=1;x<=end2;x++){
-                string LinkName = llGetLinkName(x);
-                if(LinkName == "Card"+(string)i){
-                    llSetLinkColor(x,<0,1,0>,2);
-                    jump stopFor2;
-                }
-            }
-            @stopFor2;
+            //llSay(0, "number : "+(string)llList2Integer(g_lActualCards,i)+" found in selected card list.");
+            llSetLinkColor(llList2Integer(g_lActualCards,i+1), <0,1,0>, 2);
+            //llSay(0, "set "+llList2String(g_lActualCards,i+1)+" to green on face 2");
         }
     }
+    
 }
 
 integer g_iSelectNum=0;
@@ -117,6 +124,7 @@ default
         g_kUser=llGetOwner();
         g_kTable = llGetOwner();
         
+        //g_lSelected = [5, 7, 1];
         Highlight();
     }
     
@@ -238,6 +246,8 @@ default
         if(g_iCanSelect){
             llMessageLinked(LINK_SET,0,llGetLinkName(llDetectedLinkNumber(0)),"fw_touchquery : "+(string)llDetectedLinkNumber(0) + ":" + (string)llDetectedTouchFace(0));
         }else s("You can't select a card right now");
+        
+        if(DEBUG)llSay(0, "TOUCHED NUMBER: "+(string)llDetectedLinkNumber(0));
     }
     
     run_time_permissions(integer p){

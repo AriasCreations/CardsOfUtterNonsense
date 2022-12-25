@@ -1,6 +1,7 @@
 
 integer card_channel = -32988199;
 
+string g_sText;
 integer g_iStart;
 key g_kTable;
 integer genericListen = -1;
@@ -35,6 +36,7 @@ default
     touch_start(integer t){
         if(llDetectedKey(0) == g_kCzar){
             if(!g_iConfirm){
+                llWhisper(0, g_sText);
                 llSay(0, "Touch this card again to confirm you want to select this card as winner for this round!");
                 llSetColor(<0,1,0>,2);
                 llSetTexture(TEXTURE_BLANK, 2);
@@ -90,7 +92,10 @@ default
                     llSetLinkColor(LINK_ROOT, <1,1,1>,0);
                     llMessageLinked(LINK_SET,0,"c=black", "fw_conf");
                 }
-                
+                g_sText=text;
+                if(llStringLength(text)>128){
+                    llSay(0, text);
+                }
                 llMessageLinked(LINK_SET,0,text, "fw_data : card_text");
                 
                 if(num > 1){
