@@ -12,19 +12,19 @@ default
     {
         llMessageLinked(LINK_SET,0,"","fw_reset");
     }
-    
+
     changed(integer x){
         if(x&CHANGED_REGION_START){
             llResetScript();
         }
     }
-    
+
     on_rez(integer t){
         if(t == 0){
             llResetScript();
         }
     }
-    
+
     link_message(integer s,integer n,string m,key i){
         if(n==0){
             if(i=="fw_ready"){
@@ -39,7 +39,7 @@ default
             }
         }
     }
-    
+
     listen(integer c,string n,key i,string m){
         if(g_sPath == "/"){
             if(m == "White"){
@@ -53,9 +53,9 @@ default
                 llMessageLinked(LINK_SET,0,"c=white","fw_conf : card_helpertext");
                 llSetLinkColor(LINK_ROOT,<0.2,0.2,0.2>,1);
                 llSetLinkColor(LINK_ROOT,<0.2,0.2,0.2>,0);
-                
+
                 g_sPath = "/num_req";
-                llDialog(llGetOwner(), "[Playing Card]\n\nHow many cards do you want to require the player to draw?", ["1","2", "3","4","5","6","7","8","9","10"], g_iChan);
+                llDialog(llGetOwner(), "[Playing Card]\n\nHow many cards do you want to require the player to draw?", ["1","2", "3", "4"], g_iChan);
             }
         } else if(g_sPath == "/text"){
             llMessageLinked(LINK_SET,0,m,"fw_data : card_text");
