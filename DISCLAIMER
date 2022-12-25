@@ -1,0 +1,6 @@
+Some parts of the codebase refer to the game as Cards Against Humanity
+
+
+During development this was the working codename, and I sent a email to Cards Against Humanity, seeking permission to use the name for this game. After permission was denied, the name was quickly changed to Cards of Utter Nonsense.
+
+The name in the files here will not be updated to reflect this change as some of these are old development versions i have archived and open sourced. DO NOT USE AS IS. I cannot stress that strongly enough. Permission was not granted which is why i changed the name after v1 fully came out. v2 was the effort to fully change the name in other places like the database.
