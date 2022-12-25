@@ -13,8 +13,10 @@ s(string m){
     llInstantMessage(g_kUser,m);
 }
 list g_lCards;
+integer g_iPoints = 0;
 Cards(){
-    if(!llGetAttached())return;
+    llMessageLinked(LINK_SET,0,"<!c=magenta>Points: <!c=black>"+(string)g_iPoints, "fw_data : point_text");
+    //if(!llGetAttached())return;
     integer x = 0;
     integer e = 10;
     integer CurCard = 1;
@@ -39,6 +41,7 @@ Cards(){
         llMessageLinked(LINK_SET,0,"Cards Against Humanity","fw_data : card_helpertext"+(string)CurCard);    
         CurCard++;
     }
+    
     
     if(NCard>0){
         integer CardsToRequest = NCard;
@@ -69,16 +72,16 @@ POS2(){
 }
 
 list g_lSelected = [];
-list g_lActualCards = [1, 23, 
-        2, 44,
-        3, 65,
-        4, 86,
-        5, 107,
-        6, 128,
-        7, 149,
-        8, 170,
-        9, 191,
-        10, 212
+list g_lActualCards = [1, 26, 
+        2, 47,
+        3, 68,
+        4, 89,
+        5, 110,
+        6, 131,
+        7, 152,
+        8, 173,
+        9, 194,
+        10, 215
         ];
 
 Highlight(){
@@ -102,6 +105,8 @@ integer g_iSelectNum=0;
 integer g_iCanSelect=0;
 integer g_iListen=-1;
 integer g_iChan;
+integer g_iUsePoint=0;
+
 
 ShowPrompt(){
     if(g_iListen==-1){
@@ -122,6 +127,8 @@ czar(string m){
         llMessageLinked(LINK_SET,0,"<!c=white>Pick ("+(string)num+")\nDraw ("+(string)num+")", "fw_data : czarcard_helpertext");
     }
 }
+
+integer g_iOldSel=0;
 default
 {
     state_entry()
@@ -137,8 +144,9 @@ default
         //g_lSelected = [5, 7, 1];
         Highlight();
         
-        llSetLinkColor(2, <0.078, 0.078, 0.078>, 0);
-        llSetLinkColor(2, <0.078, 0.078, 0.078>, 1);
+        llSetLinkColor(6, <0.078, 0.078, 0.078>, 0);
+        llSetLinkColor(6, <0.078, 0.078, 0.078>, 1);
+        llSetLinkColor(2, <1,1,1>,ALL_SIDES );
     }
     
     on_rez(integer t){
@@ -171,14 +179,19 @@ default
                     if(llGetListLength(g_lCards)<10 && llListFindList(g_lCards,[llJsonGetValue(m,["card"])])==-1){
                         g_lCards += llJsonGetValue(m,["card"]);
                         s("Added card: "+llJsonGetValue(m,["card", "text"]));
+                        g_iPoints = (integer)llJsonGetValue(m,["points"]);
                         Cards();
                     }
                 }
             } else if(llJsonGetValue(m,["type"]) == "select"){
                 if(g_kTable != (key)llJsonGetValue(m,["table"]))return;
+                if(llJsonValueType(m,["points", (string)g_kUser])!=JSON_INVALID){
+                    g_iPoints=(integer)llJsonGetValue(m,["points", (string)g_kUser]);
+                }
                 if(llJsonGetValue(m,["czar"]) == (string)g_kUser){
                     s("You are the Card Czar, hiding the HUD");
                     g_iCanSelect=0;
+                    //g_iPoints = (integer)llJsonGetValue(m,["points"]);
                     Cards();
                     POS2();
                 } else {
@@ -187,6 +200,7 @@ default
                     Highlight();
                     s("Select ("+(string)g_iSelectNum+") cards to submit");
                     s("Card czar: secondlife:///app/agent/"+llJsonGetValue(m,["czar"])+"/about");
+                    //g_iPoints = (integer)llJsonGetValue(m,["points"]);
                     Cards();
                     g_iCanSelect=1;
                     POS();
@@ -224,6 +238,10 @@ default
                 integer x = 0;
                 integer end = llGetListLength(g_lSelected);
                 string sActualCardData;
+                if(g_iUsePoint){
+                    g_iOldSel=g_iSelectNum;
+                    g_iSelectNum=end;
+                }
                 if(end == 0 || end!= g_iSelectNum){
                     s("You must select "+(string)g_iSelectNum+" cards!");
                 }else {
@@ -250,19 +268,52 @@ default
                     Highlight();
                     Cards();
                     //llSay(0, "(DEBUG) Sending card(s) to table: "+sActualCardData);
-                    llRegionSayTo(g_kActualTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "cards", "cards", sActualCardData]));
-                    POS2();
+                    if(!g_iUsePoint){
+                        llRegionSayTo(g_kActualTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "cards", "cards", sActualCardData]));
+                        
+                        POS2();
+                    }
+                    else{
+                        g_iPoints--;
+                        llSetLinkColor(2, <1,1,1>,ALL_SIDES );
+                        g_iUsePoint=0;
+                        llRegionSayTo(g_kActualTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "use_point", "cards", sActualCardData]));
+                        Cards();
+                        g_iSelectNum=g_iOldSel;
+                    }
                 }
             }
         }
     }
     
     touch_start(integer t){
+        if(DEBUG)llSay(0, "TOUCHED NUMBER: "+(string)llDetectedLinkNumber(0));
+        if(llGetLinkName(llDetectedLinkNumber(0)) == "Use Point"){
+            // activate card selector
+            if(!g_iUsePoint){
+                llSetLinkColor( llDetectedLinkNumber(0), <1,0,0>,ALL_SIDES );
+                if(g_iPoints >0){
+                    llDialog(llGetOwner(), "Select the card(s) you wish to return to the deck. You may return as many cards to the deck as you would like, you will then re-draw cards. This will cost you precisely (1) point.", ["-exit-"], -99);
+                    g_iUsePoint=1;
+                    return;
+                } else {
+                    llDialog(llGetOwner(), "ERROR: You do not have any points to exchange!", ["-exit-"], -99);
+                    g_iUsePoint=0;
+                    return;
+                }
+            } else {
+                llDialog(llGetOwner(), "Points will not be redeemed. Cancelling selection process", ["-exit-"],-99);
+                g_iUsePoint=0;
+                g_lSelected=[];
+                Highlight();
+                llSetLinkColor( llDetectedLinkNumber(0), <1,1,1>,ALL_SIDES );
+                return;
+            }
+        }
         if(g_iCanSelect){
             llMessageLinked(LINK_SET,0,llGetLinkName(llDetectedLinkNumber(0)),"fw_touchquery : "+(string)llDetectedLinkNumber(0) + ":" + (string)llDetectedTouchFace(0));
         }else s("You can't select a card right now");
         
-        //if(DEBUG)llSay(0, "TOUCHED NUMBER: "+(string)llDetectedLinkNumber(0));
     }
     
     run_time_permissions(integer p){
@@ -287,7 +338,20 @@ default
         if(i=="fw_ready"){
             llMessageLinked(LINK_SET,0,"c=black", "fw_conf");
             g_lCards=[];
+            /*g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
+            g_lCards +=llList2Json(JSON_OBJECT, ["text", "This is test "+(string)llFrand(4382438)]);
             
+            
+            g_iPoints++;
+            g_iCanSelect=1;*/
             llListen(hud_channel, "", "", "");
             Cards();
             POS2();
@@ -306,6 +370,22 @@ default
             string   userData  = llList2String(tokens, 6);
             
             ShowPrompt();
+            
+            if(g_iUsePoint){
+                integer CardNum = 0;
+                if(rootName=="") CardNum = (integer)llGetSubString(userData, 4,-1);
+                else CardNum = (integer)llList2String(llParseString2List(rootName, ["text"], []), -1);
+                
+                if(CardNum ==0)return;
+                integer cardIndex = llListFindList(g_lSelected,[CardNum]);
+                if(cardIndex!=-1){
+                    g_lSelected = llDeleteSubList(g_lSelected, cardIndex, cardIndex);
+                }else {
+                    g_lSelected += CardNum;
+                }
+                Highlight();
+                return;
+            }
             
             if(rootName == ""){
                 integer CardNum = (integer)llGetSubString(userData, 4,-1);

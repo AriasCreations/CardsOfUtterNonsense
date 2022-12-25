@@ -1,6 +1,7 @@
 default
 {
     state_entry(){
+        llSetMemoryLimit(15000);
         llSay(0, "Table Messages ready ("+(string)llGetFreeMemory()+"b)");
     }
     link_message(integer s,integer n,string m,key i){
@@ -21,9 +22,9 @@ default
             } else if(val == 5){
                 llWhisper(0, "Downloading list of decks...");
             } else if(val == 6){
-                llSay(0, "ERROR: No valid license key has been found. Try again later, or contact LS Bionics support\n\n[Error code: "+m+"]");
+                llSay(0, "ERROR: No valid license key has been found. Try again later, or contact ZNI Support\n\n[Error code: "+m+"]");
             } else if(val == 7){
-                llSay(0, "ERROR WHEN TOGGLING DECK. THIS IS A BUG. REPORT IT TO LS BIONICS (L:644)");
+                llSay(0, "ERROR WHEN TOGGLING DECK. THIS IS A BUG. REPORT IT TO ZNI (L:644)");
             } else if(val == 8){
                 
                 llSay(0, "Shuffling cards for decks: "+m);
@@ -37,7 +38,7 @@ default
             } else if(val == 12){
                 llWhisper(0, "Stand by...");
             } else if(val == 13){
-                llSay(0, "First Rez! Thank you for your purchase of an LS Bionics product!\n \n[Generating License Key]");
+                llSay(0, "First Rez! Thank you for your purchase of a ZNI product!\n \n[Generating License Key]");
             } else if(val == 14){
                 llWhisper(0, "Loaded Settings");
             } else if(val == 15){
@@ -61,6 +62,12 @@ default
             } else if(val == 24){
                 
                 llWhisper(0, "Card Czar: "+m+" more cards are required");
+            } else if(val == 25){
+                llWhisper(0, "Sorry! secondlife:///app/agent/"+m+"/about please join the game during the judging phase while a card is being selected.");
+            } else if(val == 26){
+                llWhisper(0, "Restarting round, a player left before judging could begin. All submitted cards will be reinserted into the deck and shuffled");
+            } else if(val == 27){
+                llDialog(i,  "[ZNI]\nCards Against Humanity\n\nINSTRUCTIONS: Click the card you want to pick twice, once to select, a second time to confirm. If you have to select more than 1 card, you must select the first card first, then the second card. Once the required number of cards have been selected, the others will automatically de-rez and a new black card will be generated.\n\nPlay: "+m+" card(s)", ["-exit-"], -3999);
             }
         }
     }

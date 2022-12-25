@@ -12,34 +12,36 @@ DecksMenu(key id){
     }
     g_iDecksChan = llRound(llFrand(5483785));
     g_iDecksListen = llListen(g_iDecksChan, "", llDetectedKey(0), "");
-    llDialog(id, "[Cards Against Humanity]\n© LS Bionics 2020\n\nSelect the decks you wish to modify, when finished, select 'CONFIRM' to lock in your choices and combine the decks for use", Buttons+["CONFIRM", "LOAD"], g_iDecksChan);
+    llDialog(id, "[Cards Against Humanity]\n© ZNI 2021\n\nSelect the decks you wish to modify, when finished, select 'CONFIRM' to lock in your choices and combine the decks for use", Buttons+["CONFIRM", "LOAD"], g_iDecksChan);
 }
 string cbox(integer a, string b){
     if(a)return "[X] "+b;
     else return "[ ] "+b;
 }
 
+UploadCards(list lTmp){
+    
+    while(llGetListLength(lTmp)){
+        // send card back to server
+        Send("/Modify_Card.php?TYPE_OVERRIDE=INSERT&CARD_TEXT="+llEscapeURL(llJsonGetValue(llList2String(lTmp, 0), ["card", "text"]))+"&TABLE_ID="+(string)g_kID, "POST");
+        lTmp = llDeleteSubList(lTmp, 0,0);
+    }
+}
+
 key g_kID;
 integer g_iDecksChan;
 integer g_iDecksListen=-1;
 UpDecks(){
-    list lAct;
-    integer i=0;
-    integer end = llGetListLength(g_lSelectedDecks);
-    for(i=0;i<end;i+=2){
-        if((integer)llList2String(g_lSelectedDecks,i+1)) lAct += llList2String(g_lSelectedDecks,i);
-        
-    }
-    if(llGetListLength(lAct)==0)    llMessageLinked(LINK_SET, 50, "", "1");
-    Send("/Modify_Card.php?TYPE_OVERRIDE=SET_OPTIONS&TABLE_ID="+(string)g_kID+"&DECK="+llEscapeURL(llStringToBase64(llDumpList2String(lAct, "~"))), "POST");
+    if(llGetListLength(g_lSelectedDecks)==0)    llMessageLinked(LINK_SET, 50, "", "1");
+    Send("/Modify_Card.php?TYPE_OVERRIDE=SET_OPTIONS&TABLE_ID="+(string)g_kID+"&DECK="+llEscapeURL(llStringToBase64(llDumpList2String(g_lSelectedDecks, "~"))), "POST");
 }
 
 
 
 string g_sVersion = "1.0.0.0000";
-integer DEBUG = FALSE;
+integer DEBUG = TRUE;
 list g_lReqs;
-string URL = "https://api.zontreck.dev/ls_bionics";
+string URL = "https://api.zontreck.dev/zni";
 Send(string Req,string method){
     g_lReqs += [Req,method];
     Sends();
@@ -64,24 +66,29 @@ DoNextRequest(){
 }
 
 integer g_iStarted;
+integer g_iExpectDeckLoad=0;
+integer ingredient_channel = -8392888;
 
 default
 {
     state_entry(){
-        
+        llSetMemoryLimit(35000);
         g_kID = (key)llGetObjectDesc();
         llWhisper(0, "Decks Handler ("+(string)llGetFreeMemory()+"b)");
+        llListen(ingredient_channel+1, "", "", "");
     }
     
     link_message(integer s,integer n,string m,key i){
         if(n == 0){
             Send("/Get_Product_Data.php?PRODUCT=CAH_TABLE&NICKNAME=License&KEYID="+(string)i, "GET");
         } else if(n==-1)llResetScript();
-        else if(n == 5){
+        else if(n == -5){
             g_lSelectedDecks+=[m,1];
             UpDecks();
-        } else if(n == 11){
+        } else if(n == -11){
             g_iStarted=1;
+        } else if(n == -12){
+            UploadCards(llJson2List(m));
         }
     }
     
@@ -108,6 +115,13 @@ default
         }
     }
     http_response(key r,integer s,list m, string b){
+        //llOwnerSay(b);
+        if(s!=200){
+            llSay(0, "Error code :"+(string)s);
+            g_kCurrentReq=NULL_KEY;
+            Sends();
+            return;
+        }
         if(r == g_kCurrentReq){
             if(s!=200){
                 llMessageLinked(LINK_SET, 50, "", "3");
@@ -135,12 +149,16 @@ default
                 g_lSelectedDecks = llParseString2List(llList2String(lTmp,1),["~"],[]);
                 if(llList2String(lTmp,1) == "0"){
                     g_lSelectedDecks = ["OFFICIAL",1];
-                    Send("/Modify_Card.php?TYPE_OVERRIDE=SET_OPTIONS&DECK="+llEscapeURL(llStringToBase64("OFFICIAL"))+"&TABLE_ID="+(string)g_kID,"POST");
+                    Send("/Modify_Card.php?TYPE_OVERRIDE=SET_OPTIONS&DECK="+llEscapeURL(llStringToBase64("OFFICIAL~1"))+"&TABLE_ID="+(string)g_kID,"POST");
                     Send("/Modify_Card.php?TYPE_OVERRIDE=OPTIONS&TABLE_ID="+(string)g_kID, "GET"); 
+                    
                 } else {
                     llMessageLinked(LINK_SET,1,llDumpList2String(g_lSelectedDecks,"~"),"");
+                    llMessageLinked(LINK_SET,999,"","");
                 }
                 
+            } else if(Script == "Set_Card_Options"){
+                Send("/Modify_Card.php?TYPE_OVERRIDE=OPTIONS&TABLE_ID="+(string)g_kID,"GET");
             }
             
             Sends();
@@ -151,6 +169,12 @@ default
         if(llGetListLength(g_lSelectedDecks)==0){
             llMessageLinked(LINK_SET,-2,"","");
             llSetTimerEvent(0);
+        }
+        Sends();
+        
+        if(llGetTime()>=15.0 && g_iExpectDeckLoad){
+            g_iExpectDeckLoad=0;
+            llWhisper(0, "No nearby deck found");
         }
     }
     
@@ -174,7 +198,10 @@ default
                     
                     llSetTimerEvent(5);
                 } else if(m == "LOAD"){
-                    llMessageLinked(LINK_SET,10,"","");
+                    g_iExpectDeckLoad=1;
+                    llResetTime();
+                    llSay(ingredient_channel, "scan");
+                    llSetTimerEvent(1);
                     return;
                 } else llMessageLinked(LINK_SET, 50, "", "7");
             } else {
@@ -183,6 +210,18 @@ default
             
             
             DecksMenu(i);
+        } else if(c==ingredient_channel+1){
+            if(m == "rezzed Deck" || m == "Deck"){
+                if(g_iExpectDeckLoad){
+                    g_iExpectDeckLoad = 0;
+                    string Deck = llList2String(llGetObjectDetails(i,[OBJECT_DESC]),0);
+                    llWhisper(0, "Activating deck...");
+                    llMessageLinked(LINK_SET,-5,Deck,"");
+                    llRegionSayTo(i, ingredient_channel, (string)i);
+                    
+                    llWhisper(0, "Deck activated!");
+                }
+            }
         }
     }
             

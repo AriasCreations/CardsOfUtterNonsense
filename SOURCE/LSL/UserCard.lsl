@@ -61,7 +61,7 @@ default
             llMessageLinked(LINK_SET,0,m,"fw_data : card_text");
             g_sText = m;
             g_sPath = "/confirm";
-            llDialog(llGetOwner(), "Does this card look correct?\n\nIf you select yes, your card will be uploaded to the community deck for this year. If you decide you no longer wish your card to be uploaded, you will need to contact LS Bionics Support", ["Yes", "No"], g_iChan);
+            llDialog(llGetOwner(), "Does this card look correct?\n\nIf you select yes, your card will be uploaded to the community deck for this year. If you decide you no longer wish your card to be uploaded, you will need to contact ZNI Support", ["Yes", "No"], g_iChan);
         } else if(g_sPath == "/num_req"){
             g_iNum = (integer)m;
             g_sPath = "/text";
@@ -73,11 +73,11 @@ default
             if(m == "Yes"){
                 llSay(0, "Uploading card...");
                 list dat = llParseString2List(llGetDate(),["-"],[]);
-                llSetObjectName("CAH: "+llList2String(dat,0)+" Playing Card [LS]");
+                llSetObjectName("CAH: "+llList2String(dat,0)+" Playing Card [ZNI]");
                 llSetObjectDesc("Card created by: "+llKey2Name(llGetOwner()));
                 g_kAuthor = llGetOwner();
                 string CARD_ID = (string)llGetOwner()+"-"+(string)llGetUnixTime();
-                llHTTPRequest("https://api.zontreck.dev/ls_bionics/Modify_Card.php", [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/x-www-form-urlencoded"], "DECK="+llList2String(dat,0)+"&CARD_TEXT="+llStringToBase64(g_sText)+"&COLOR="+(string)g_iColor+"&DRAW_COUNT="+(string)g_iNum+"&CARD_ID="+llEscapeURL(CARD_ID));
+                llHTTPRequest("https://api.zontreck.dev/zni/Modify_Card.php", [HTTP_METHOD, "POST", HTTP_MIMETYPE, "application/x-www-form-urlencoded"], "DECK="+llList2String(dat,0)+"&CARD_TEXT="+llStringToBase64(g_sText)+"&COLOR="+(string)g_iColor+"&DRAW_COUNT="+(string)g_iNum+"&CARD_ID="+llEscapeURL(CARD_ID));
                 state myCard;
             } else if(m == "No"){
                 llSay(0, "Card creation cancelled! Deleting temp data");
