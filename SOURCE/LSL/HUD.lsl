@@ -1,6 +1,8 @@
 integer g_iStartParam;
 key g_kUser;
 key g_kTable;
+key g_kActualTable;
+integer DEBUG=FALSE;
 
 integer card_channel = -32988199;
 integer hud_channel = -328478727;
@@ -15,9 +17,13 @@ Cards(){
     integer e = 10;
     integer CurCard = 1;
     integer NCard = 0;
+    
+    if(DEBUG)llSay(0, "CARD LIST: "+llDumpList2String(g_lCards, " - "));
+    
     for(x=0;x<e;x++){
         if(llGetListLength(g_lCards) > x){
             string card_params = llList2String(g_lCards,x);
+            if(DEBUG)llSay(0,"Card Parameters: "+card_params);
             llMessageLinked(LINK_SET,0,llJsonGetValue(card_params,["text"]), "fw_data : card_text"+(string)CurCard);
         } else {
             NCard++;
@@ -30,21 +36,25 @@ Cards(){
     
     if(NCard>0){
         integer CardsToRequest = NCard;
+        if(CardsToRequest>0)CardsToRequest=1;
         if(CardsToRequest == 0)return;
         else {
-            llRegionSayTo(g_kTable,hud_channel, llList2Json(JSON_OBJECT, ["type","card_request","count", CardsToRequest]));
+            llOwnerSay("Drawing "+(string)CardsToRequest+" cards");
+            llRegionSayTo(g_kActualTable,hud_channel, llList2Json(JSON_OBJECT, ["type","card_request","count", CardsToRequest]));
         }
     }
 }
-
+integer g_iVis=0;
 POS(){
     if(!llGetAttached())return;
+    g_iVis=1;
     vector local = <0.02395, 0.47113, -0.15166>;
     llSetPrimitiveParams([PRIM_POS_LOCAL, local]);
 }
 
 POS2(){
     if(!llGetAttached())return;
+    g_iVis=0;
     vector local = <0.02395, 1.77734, -0.15166>;
     llSetPrimitiveParams([PRIM_POS_LOCAL, local]);
 }
@@ -122,10 +132,12 @@ default
     }
     
     listen(integer c,string n,key i,string m){
+        if(DEBUG)llSay(0, m);
         if(g_iStartParam == c){
             // listen for the UUID of who to attach the HUD to!
             if(llJsonGetValue(m,["type"])=="activate"){
                 g_kTable = (key)llJsonGetValue(m,["table"]);
+                g_kActualTable = i;
                 llWhisper(0, "HUD now activating...");
                 key g_kUser = (key)llJsonGetValue(m, ["user"]);
                 llRequestPermissions(g_kUser, PERMISSION_ATTACH);
@@ -138,13 +150,16 @@ default
                     if(llGetListLength(g_lCards)<10 && llListFindList(g_lCards,[llJsonGetValue(m,["card"])])==-1){
                         g_lCards += llJsonGetValue(m,["card"]);
                         s("Added card: "+llJsonGetValue(m,["card", "text"]));
+                        Cards();
                     }
                 }
             } else if(llJsonGetValue(m,["type"]) == "select"){
+                if(g_kTable != (key)llJsonGetValue(m,["table"]))return;
                 if(llJsonGetValue(m,["czar"]) == (string)g_kUser){
                     s("You are the Card Czar, hiding the HUD");
                     POS2();
                     g_iCanSelect=0;
+                    Cards();
                 } else {
                     g_iSelectNum = (integer)llJsonGetValue(m,["sel_count"]);
                     POS();
@@ -156,6 +171,7 @@ default
                     g_iCanSelect=1;
                 }
             } else if(llJsonGetValue(m,["type"]) == "judging"){
+                if(g_kTable != (key)llJsonGetValue(m,["table"]))return;
                 s("Judging begun. HUD hidden!");
                 POS2();
                 g_lSelected=[];
@@ -167,7 +183,7 @@ default
                     g_iChan=0;
                 }
             } else if(llJsonGetValue(m,["type"])=="die"){
-                llSay(0, "(DEBUG)\nm: "+m+"\n-> Table: "+(string)g_kTable+"\n-> User: "+(string)g_kUser);
+                if(DEBUG)llSay(0, "(DEBUG)\nm: "+m+"\n-> Table: "+(string)g_kTable+"\n-> User: "+(string)g_kUser);
                 if(llJsonGetValue(m,["table"])==(string)g_kTable){
                     if(llJsonGetValue(m,["avatar"])==(string)g_kUser || llJsonGetValue(m,["avatar"])==(string)NULL_KEY || llJsonGetValue(m,["avatar"])==""){
                         llSay(0, "Deactivating HUD");
@@ -193,6 +209,7 @@ default
                         integer CardNum = llList2Integer(g_lSelected, x);
                         string CardQuery = llList2String(g_lCards, (CardNum-1));
                         lToRemove += CardQuery;
+                        CardQuery = llJsonSetValue(CardQuery, ["user"], g_kUser);
                         sActualCardData = llJsonSetValue(sActualCardData, [x], CardQuery);
                     }
                     x=0;
@@ -210,7 +227,7 @@ default
                     Highlight();
                     Cards();
                     //llSay(0, "(DEBUG) Sending card(s) to table: "+sActualCardData);
-                    llRegionSayTo(g_kTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "cards", "cards", sActualCardData]));
+                    llRegionSayTo(g_kActualTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "cards", "cards", sActualCardData]));
                     POS2();
                 }
             }
@@ -232,7 +249,7 @@ default
     attach(key id){
         if(id == NULL_KEY){
             llWhisper(0, "HUD is deactivating...");
-            llRegionSayTo(g_kTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "leave", "avatar", g_kUser]));
+            llRegionSayTo(g_kActualTable, hud_channel, llList2Json(JSON_OBJECT, ["type", "leave", "avatar", g_kUser]));
             //llRemoveInventory(llGetScriptName());
         } else {
             g_kUser=id;
@@ -306,7 +323,7 @@ state detach
     state_entry(){
         integer i=0;
         integer end = llGetNumberOfPrims();
-        for(i=1;i<=end;i++){
+        for(i=2;i<=end;i++){
             llSetLinkPrimitiveParamsFast(i,[PRIM_SIZE,ZERO_VECTOR,PRIM_POS_LOCAL,ZERO_VECTOR,PRIM_ROT_LOCAL,ZERO_ROTATION]);
         }
         llSleep(2);

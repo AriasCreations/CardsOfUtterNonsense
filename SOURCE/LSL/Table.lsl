@@ -6,6 +6,7 @@ integer card_channel = -32988199;
 integer hud_channel = -328478727;
 
 list g_lPoints;
+integer g_iStarted;
 GiveUserPoint(key kUser){
     // point list - user, num of points
     integer index = llListFindList(g_lPoints,[kUser]);
@@ -16,10 +17,38 @@ GiveUserPoint(key kUser){
         curPoint++;
         g_lPoints=llListReplaceList(g_lPoints,[curPoint], index+1,index+1);
     }
+    UpScores();
 }
+
+UpScores(){
+    
+    integer i=0;
+    integer iScores;
+    integer end = llGetNumberOfPrims();
+    for(i=0;i<=end;i++){
+        string name = llGetLinkName(i);
+        if(name == "Scores"){
+            iScores=i;
+            jump outScore;
+        }
+    }
+    @outScore;
+    i=0;
+    end=llGetListLength(g_lPoints);
+    string sScores;
+    for(i=0;i<end;i+=2){
+        sScores += llKey2Name(llList2String(g_lPoints, i))+": "+llList2String(g_lPoints,i+1)+"\n";
+    }
+    llSetLinkPrimitiveParams(iScores, [PRIM_TEXT, sScores, <1,0,0>,1]);
+}
+
+list g_lJudgePile;
+integer g_iTotalJudgeUsers;
+
 string g_sVersion = "1.0.0.0000";
 key g_kToken;
 integer DEBUG = FALSE;
+float offset;
 list g_lReqs;
 string URL = "https://api.zontreck.dev/ls_bionics";
 Send(string Req,string method){
@@ -142,11 +171,14 @@ key g_kID;
 integer g_iBlockRez = 0;
 key g_kCurrentBlackCard;
 list g_lPendingCards;
+
 default
 {
     state_entry()
     {
+        llSitTarget(ZERO_VECTOR,ZERO_ROTATION);
         Chairs=[];
+        UpScores();
         //llSay(0, "Activating Setup Mode");
         //llSay(0, "Scanning linkset for positions of prims");
         integer i=0;
@@ -246,12 +278,13 @@ state active
         g_iBlockRez=0;
         g_lPending=[];
         
+        llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "die", "table", g_kID]));
         llListen(hud_channel, "", "", "");
         llListen(card_channel, "", "", "");/*
         integer chan = llRound(llFrand(548378));
         g_lPendingCards += [chan, "null|black"];
         llRezObject("Playing Card [LS]", llGetPos(), ZERO_VECTOR, ZERO_ROTATION, chan);*/
-        llSitTarget(<0,0,1>, ZERO_ROTATION);
+        
     }
     
     http_response(key r,integer s,list m,string b){
@@ -260,14 +293,16 @@ state active
             g_lReqs = llDeleteSubList(g_lReqs,0,1);
             
             list lTmp = llParseString2List(b,[";;",";"],[]);
+            if(DEBUG)llSay(0, "HTTP REPLY: "+b);
             string Script = llList2String(lTmp,0);
             if(Script == "Modify_Deck"){
                 llSay(0, "Deck generated!");
             } else if(Script == "Get_Card"){
                 key Sender = (key)llList2String(lTmp,1);
-                list Params = llJson2List(llBase64ToString(llList2String(lTmp,2)));//llParseString2List(llBase64ToString(llList2String(lTmp,2)), ["|"],[]);
-                if(DEBUG)llSay(0, "HTTP REPLY: "+b);
+                list Params = llJson2List(llBase64ToString(llList2String(lTmp,2)));
                 if(DEBUG)llSay(0, "PARAMETER LIST: "+llList2CSV(Params));
+
+                //llParseString2List(llBase64ToString(llList2String(lTmp,2)), ["|"],[]);
                 integer i=0;
                 integer end = llGetListLength(Params);
                 for(i=0;i<end;i++){
@@ -276,7 +311,7 @@ state active
                     integer num_req = (integer)llJsonGetValue(llList2String(Params,i),["num"]);
                     integer rezzed = (integer)llJsonGetValue(llList2String(Params,i), ["rezzed"]);
                     if(rezzed==0)
-                        llRegionSayTo(Sender, hud_channel, llList2Json(JSON_OBJECT, ["type", "card", "avatar", llGetOwnerKey(Sender), "card", llList2Json(JSON_OBJECT, ["text", llList2String(Params,i)])]));
+                        llRegionSayTo(Sender, hud_channel, llList2Json(JSON_OBJECT, ["type", "card", "avatar", llGetOwnerKey(Sender), "card", llList2Json(JSON_OBJECT, ["text", llJsonGetValue(llList2String(Params,i), ["text"])])]));
                     else{
                         if(color){
                             g_kCurrentBlackCard = Sender;
@@ -292,11 +327,39 @@ state active
                             }
                             
                             key czar = llList2String(Players,g_iCzar);
-                            llRegionSay(hud_channel, llList2Json(JSON_OBJECT, ["type", "select", "czar", czar, "sel_count", num_req]));
+                            llSay(0, "Card Czar is: secondlife:///app/agent/"+(string)czar+"/about");
+                            
+                            llRegionSay(hud_channel, llList2Json(JSON_OBJECT, ["type", "select", "czar", czar, "sel_count", num_req, "table", g_kID]));
                         }
-                        llRegionSayTo(Sender, card_channel, llList2Json(JSON_OBJECT, ["type", "set", "card", llList2Json(JSON_OBJECT, ["text", card_text, "color", color, "num", num_req])]));
+                        llRegionSayTo(Sender, card_channel, llList2Json(JSON_OBJECT, ["type", "set", "card", llList2Json(JSON_OBJECT, ["text", card_text, "color", color, "num", num_req, "czar", llList2String(Players,g_iCzar), "user", llList2String(lTmp,3)])]));
                     }
                 }
+            } else if(Script == "Modify_Card"){
+                string Sender = llList2String(lTmp,6);
+                string Color = llList2String(lTmp,2);
+                string Text = llBase64ToString(llList2String(lTmp,3));
+                integer num = llList2Integer(lTmp,4);
+                string user = llList2String(lTmp,5);
+                
+                if(DEBUG)llSay(0, "SEARCH RESULT: "+Text);
+            } else if(Script == "No More Cards"){
+                
+                llSay(0, "Game over! No more black cards exist in the deck... Checking for winner...");
+                integer iLastHigh;
+                key kLastHigh;
+                integer x=0;
+                integer xe = llGetListLength(g_lPoints);
+                for(x=0;x<xe;x++){
+                    key User = llList2Key(g_lPoints,x);
+                    integer points = llList2Integer(g_lPoints,x+1);
+                    if(points>iLastHigh){
+                        iLastHigh=points;
+                        kLastHigh = User;
+                    }
+                }
+                                
+                llSay(0, "WINNER IS: secondlife:///app/agent/"+(string)kLastHigh+"/about with "+(string)iLastHigh+" points total!!");
+                llResetScript();
             }
             
             
@@ -324,24 +387,62 @@ state active
                     llRegionSayTo(i,llList2Integer(g_lPending,index+1), llList2Json(JSON_OBJECT, ["type", "activate", "user", llList2String(g_lPending,index), "table", g_kID]));
                     g_lPending = llDeleteSubList(g_lPending, index,index+1);
                 }
+            } else if(llJsonGetValue(m,["type"]) == "cards"){
+                list lCards = llJson2List(llJsonGetValue(m,["cards"]));
+                g_lJudgePile += lCards;
+                g_iTotalJudgeUsers++;
+                
+                if(g_iTotalJudgeUsers == llGetListLength(Players)-1){
+                    llSay(hud_channel, llList2Json(JSON_OBJECT, ["type", "judging", "table", g_kID]));
+                    llSay(0, "Card Czar: Pick the card you want!");
+                    // Initiate the rezzing procedure
+                    integer x =0;
+                    integer e = llGetListLength(g_lJudgePile);
+                    for(x=0;x<e;x++){
+                        integer bootNum = llRound(llFrand(34857483));
+                        string json = llList2String(g_lJudgePile, x);
+                        key user = llJsonGetValue(json, ["user"]);
+                        g_lPendingCards += [bootNum, (string)user+"|"+llJsonGetValue(json,["text"])];
+                        
+                        
+                        llRezObject("Playing Card [LS]", llGetPos(), ZERO_VECTOR,ZERO_ROTATION, bootNum);
+                    }
+                }
             }
         } else if(c==card_channel){
             if(llJsonGetValue(m,["type"])=="alive"){
-                llSay(0, "IN ALIVE BLOCK");
+                //llSay(0, "IN ALIVE BLOCK");
                 integer index = llListFindList(g_lPendingCards,[(integer)llJsonGetValue(m,["boot"])]);
                 if(index==-1){
                     return;
                 }
                 
+                string pendingCommand = llList2String(g_lPendingCards,index+1);
+                list lCmd = llParseString2List(pendingCommand, ["|"],[]);
                 
                 g_lPendingCards = llDeleteSubList(g_lPendingCards,index,index+1);
                 
                 llRegionSayTo(i, (integer)llJsonGetValue(m,["boot"]), llList2Json(JSON_OBJECT, ["type", "activate", "table", g_kID]));
                 // Calculate position offset
                 llSleep(1);
-                llRegionSayTo(i, card_channel, llList2Json(JSON_OBJECT, ["type", "position", "pos", llGetPos()+<0,0,0.5>]));
+                if(llList2String(lCmd,0) == "null"){
+                    offset = 0.0;
+                }
+                llRegionSayTo(i, card_channel, llList2Json(JSON_OBJECT, ["type", "position", "pos", llGetPos()+<0,offset,0.75>]));
                 if(DEBUG)llSay(0, "Alive request on the Cards Channel: "+m);
-                Send("/Modify_Card.php?TYPE_OVERRIDE=GET_CARD&TABLE_ID="+(string)g_kID+"&COLOR=1&DRAW_COUNT=1&SENDER="+(string)i+"&REZZED=1", "POST");
+                
+                string color = "1";
+                offset += 0.25;
+                string cmd= "GET_CARD";
+                if(llList2String(lCmd,1) != "black"){
+                    //cmd = "SEARCH&CARD_TEXT="+llStringToBase64(llList2String(lCmd,1))+"&AVATAR="+llList2String(lCmd,0);
+                    color="0";
+                    llRegionSayTo(i, card_channel, llList2Json(JSON_OBJECT, ["type", "set","card", llList2Json(JSON_OBJECT, ["text", llList2String(lCmd,1), "color", 0, "num", 0, "czar", llList2String(Players, g_iCzar), "user", llList2String(lCmd,0)])]));
+                    return;
+                }
+                Send("/Modify_Card.php?TYPE_OVERRIDE="+cmd+"&TABLE_ID="+(string)g_kID+"&COLOR="+color+"&DRAW_COUNT=1&SENDER="+(string)i+"&REZZED=1", "POST");
+
+
 
             } else if(llJsonGetValue(m,["type"]) == "final"){
                 key kUser = (key)llJsonGetValue(m,["user"]);
@@ -351,6 +452,19 @@ state active
                 llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "die", "table", g_kID]));
                 // Start next round!
                 // Load the next black card to trigger selection mode
+                integer boot = llRound(llFrand(5483758));
+                g_lPendingCards += [boot, "null|black"];
+                
+                integer x =0;
+                integer ends = llGetListLength(g_lJudgePile);
+                g_iTotalJudgeUsers = 0;
+                for(x=0;x<ends;x++){
+                    string card = llList2String(g_lJudgePile,x);
+                    Send("/Modify_Card.php?TYPE_OVERRIDE=INSERT&TABLE_ID="+(string)g_kID+"&CARD_TEXT="+llStringToBase64(llJsonGetValue(card,["text"])), "POST");
+                }
+                
+                g_lJudgePile=[];
+                llRezObject("Playing Card [LS]", llGetPos(), ZERO_VECTOR,ZERO_ROTATION,boot);
             }
         } else if(llListFindList(g_lListener,[c])!=-1){
             integer index = llListFindList(g_lListener,[c]);
@@ -379,14 +493,21 @@ state active
         llResetScript();
     }
     
+    timer(){
+        Sends();
+    }
+    
     touch_start(integer t){
         string name = llGetLinkName(llDetectedLinkNumber(0));
         if(name == "START"){
-            
+            if(g_iStarted)return;
+            g_iStarted=TRUE;
             if(!(llGetListLength(Players) > 1)){
                 llSay(0, "Must have more than 1 player to start!");
+                return;
             }
             // Begin the game loop
+            llSetTimerEvent(5);
             integer chan = llRound(llFrand(548378));
             g_lPendingCards += [chan, "null|black"];
             llRezObject("Playing Card [LS]", llGetPos(), ZERO_VECTOR, ZERO_ROTATION, chan);
@@ -398,6 +519,11 @@ state active
             llDialog(i, "Are you male or female?", ["Female", "Male"], rnd);
             
             llRequestPermissions(i, PERMISSION_TRIGGER_ANIMATION);
+        } else if(name == "STOP"){
+            if(g_iStarted){
+                Send("/Modify_Card.php?TYPE_OVERRIDE=NULCARD&TABLE_ID="+(string)g_kID,"GET");
+                llSay(0, "Stopping the game please wait...");
+            }
         }
     }
 }

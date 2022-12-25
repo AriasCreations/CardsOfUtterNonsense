@@ -25,7 +25,7 @@ default
         }else{
             llListenRemove(genericListen);
             genericListen = llListen(card_channel, "", "", "");
-            llSay(0, "Card is trying to find a table");
+            //llSay(0, "Card is trying to find a table");
             llListen(t, "", "", "");
             g_iStart=t;
             llSay(card_channel, llList2Json(JSON_OBJECT, ["type", "alive", "boot", t]));
